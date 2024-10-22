@@ -1,6 +1,5 @@
 local M = {}
 
--- 检查文件是否存在
 local function file_exists(name)
     local f = io.open(name, "r")
     if f ~= nil then
@@ -11,7 +10,6 @@ local function file_exists(name)
     end
 end
 
--- 获取需要压缩的文件列表和默认的归档文件名
 local get_compression_target = ya.sync(function()
     local tab = cx.active
     local default_name
@@ -29,21 +27,19 @@ local get_compression_target = ya.sync(function()
         for _, url in pairs(tab.selected) do
             table.insert(paths, tostring(url))
         end
-        -- 取消选中的文件
         ya.manager_emit("escape", {})
     end
     return paths, default_name
 end)
 
--- 调用压缩命令
+-- call dwarfs command
 local function invoke_compress_command(paths, name)
     local cmd_output, err_code = Command("mkdwarfs")
-        :args({ "-i", table.concat(paths, " "), "-o", name }) -- 设置压缩命令参数
-        :stderr(Command.PIPED)                            -- 将标准错误重定向到管道
-        :output()                                         -- 执行命令并获取输出
+        :args({ "-i", table.concat(paths, " "), "-o", name }) 
+        :stderr(Command.PIPED)                            
+        :output()                                         
 
     if err_code ~= nil then
-        -- 如果命令执行失败，显示错误通知
         ya.notify({
             title = "Failed to run dwarfs command",
             content = "Status: " .. err_code,
@@ -51,7 +47,6 @@ local function invoke_compress_command(paths, name)
             level = "error",
         })
     elseif not cmd_output.status.success then
-        -- 如果命令执行失败，显示错误通知
         ya.notify({
             title = "Compression failed: status code " .. cmd_output.status.code,
             content = cmd_output.stderr,
