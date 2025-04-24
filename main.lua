@@ -1,5 +1,4 @@
 local M = {}
-
 -- 检查文件是否存在
 local function file_exists(name)
     local f = io.open(name, "r")
@@ -31,9 +30,8 @@ local get_compression_target = ya.sync(function()
             return
         end
     else
-        -- 如果有选中的文件或文件夹：
         -- 获取当前工作目录的名称并赋值给 default_name。
-        default_name = tab.current.cwd:name()
+        default_name = tab.current.cwd.name
         -- 遍历所有选中的文件或文件夹，
         for _, url in pairs(tab.selected) do
             -- 将其路径转换为字符串并插入到 paths 列表中。
@@ -51,31 +49,13 @@ local function invoke_compress_command(paths)
         local name = path:match("([^/\\]+)$") -- 获取目录名称
         local output_file = name .. ".dwarfs" -- 生成输出文件名
 
-        local cmd_output, err_code = Command("mkdwarfs") --创建mkdwarfs命令执行对象
-            :args({ "-i", path, "-o", output_file, "-N", 6 }) -- 设置压缩命令参数
-            :stderr(Command.PIPED)                            -- 将标准错误重定向到管道
-            :output()                                         -- 执行命令并获取输出
+        -- 构建命令字符串
+        local command = string.format('mkdwarfs -i "%s" -o "%s" -N 6', path, output_file)
 
-        if err_code ~= nil then
-            -- 如果命令执行失败，显示错误通知
-            ya.notify({
-                title = "Failed to run dwarfs command",
-                content = "Status: " .. err_code,
-                timeout = 5.0,
-                level = "error",
-            })
-        elseif not cmd_output.status.success then
-            -- 如果命令执行失败，显示错误通知
-            ya.notify({
-                title = "Compression failed: status code " .. cmd_output.status.code,
-                content = cmd_output.stderr,
-                timeout = 5.0,
-                level = "error",
-            })
-        end
+        -- 使用 os.execute 运行命令
+        local result = os.execute(command)
     end
 end
-
 
 -- 调用挂载命令
 local function invoke_mount_command(name,mount_point)
@@ -109,20 +89,40 @@ function M:entry(job)
     local action = job.args[1]
     local default_fmt = job.args[2]
     if action == "mkdwarfs" then
-        -- 获取需要压缩的文件列表和默认的归档文件名
-        local paths, _ = get_compression_target()
-        -- 获取用户输入的归档文件名
-        local output_name, name_event = ya.input({
-            title = "Do you want create dwarfs?",
-            value = default_fmt,
-            position = { "top-center", y = 3, w = 40 },
+        -- 定义候选项
+        local cand_index = ya.which({
+            cands = {
+                { on = "y", desc = "Yes, create dwarfs archive" },
+                { on = "n", desc = "No, cancel operation" },
+            },
+            silent = false, -- 显示按键指示器的 UI
         })
-        if name_event ~= 1 then
-            return -- 如果用户取消输入，退出
-        end
 
-        -- use mkdwarfs command compress
-        invoke_compress_command(paths)
+        -- 根据用户选择的候选项执行逻辑
+        if cand_index == 1 then
+            -- 用户选择了 "y"
+            local paths, _ = get_compression_target()
+            ya.hide()
+            invoke_compress_command(paths)
+        elseif cand_index == 2 then
+            -- 用户选择了 "n"
+            ya.notify({
+                title = "Operation Cancelled",
+                content = "You chose not to create dwarfs.",
+                timeout = 3.0,
+                level = "info",
+            })
+            return
+        else
+            -- 用户取消了操作或输入无效
+            ya.notify({
+                title = "No Action Selected",
+                content = "You did not select a valid option.",
+                timeout = 3.0,
+                level = "warn",
+            })
+            return
+        end
     -- if use dwarfs mount command
     elseif action == "dwarfs" then
         local _, default_name = get_compression_target()
