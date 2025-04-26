@@ -50,10 +50,28 @@ local function invoke_compress_command(paths)
         local output_file = name .. ".dwarfs" -- 生成输出文件名
 
         -- 构建命令字符串
-        local command = string.format('mkdwarfs -i "%s" -o "%s" -N 6', path, output_file)
+        local cmd_output, err_code = Command("mkdwarfs") --创建mkdwarfs命令执行对象
+            :args({ "-i", path, "-o", output_file, "-N", 6 }) -- 设置压缩命令参数
+            :stderr(Command.PIPED)                            -- 将标准错误重定向到管道
+            :output()                                         -- 执行命令并获取输出
 
-        -- 使用 os.execute 运行命令
-        local result = os.execute(command)
+        if err_code ~= nil then
+            -- 如果命令执行失败，显示错误通知
+            ya.notify({
+                title = "Failed to run dwarfs command",
+                content = "Status: " .. err_code,
+                timeout = 5.0,
+                level = "error",
+            })
+        elseif not cmd_output.status.success then
+            -- 如果命令执行失败，显示错误通知
+            ya.notify({
+                title = "Compression failed: status code " .. cmd_output.status.code,
+                content = cmd_output.stderr,
+                timeout = 5.0,
+                level = "error",
+            })
+        end
     end
 end
 
